@@ -54,6 +54,7 @@ contains
 !
 !> reads in output filenames typically used to analyse and visualise ventilation model results
   subroutine read_geometry_evaluate_flow()
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_READ_GEOMETRY_EVALUATE_FLOW" :: READ_GEOMETRY_EVALUATE_FLOW
 
     ! Input related variables
     character(len=255) :: buffer, label
@@ -110,6 +111,7 @@ contains
   !###################################################################################
 
   subroutine read_geometry_main()
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_READ_GEOMETRY_MAIN" :: READ_GEOMETRY_MAIN
 
     ! Input related variables
     character(len=255) :: buffer, label
@@ -182,6 +184,7 @@ contains
 !#####################################################################################################
 !
   function get_filename(label) result(str)
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_GET_FILENAME" :: GET_FILENAME
 
     character(len=MAX_STRING_LEN), intent(in) :: label
     character(len=MAX_FILENAME_LEN) :: str

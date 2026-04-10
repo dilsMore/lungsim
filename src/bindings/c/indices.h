@@ -7,5 +7,6 @@ SHO_PUBLIC void ventilation_indices();
 SHO_PUBLIC void perfusion_indices();
 SHO_PUBLIC int get_ne_radius();
 SHO_PUBLIC int get_nj_conc1();
+SHO_PUBLIC void particle_indices();
 
 #endif /* AETHER_INDICES_H */

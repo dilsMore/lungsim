@@ -3,6 +3,6 @@
 
 #include "symbol_export.h"
 
-SHO_PUBLIC void steadystate_gasexchange();
+SHO_PUBLIC void solve_ss_gasexchange();
 
 #endif /* AETHER_GAS_EXCHANGE_H */

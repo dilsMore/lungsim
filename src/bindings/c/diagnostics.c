@@ -18,9 +18,7 @@ void set_diagnostics_on(int state)
 	set_diagnostics_on_c(&state);
 }
 
-int get_diagnostics_on()
+void get_diagnostics_on(int state)
 {
-	int state;
 	get_diagnostics_on_c(&state);
-	return state;
 }

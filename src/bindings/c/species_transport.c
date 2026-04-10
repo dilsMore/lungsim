@@ -1,9 +1,10 @@
 
 #include "species_transport.h"
 
-void initialise_transport_c();
+void initialise_exchange_c();
 
-void initialise_transport()
+
+void initialise_exchange()
 {
-	initialise_transport_c();
+	initialise_exchange_c();
 }

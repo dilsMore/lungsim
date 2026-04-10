@@ -40,9 +40,6 @@ endif()
 # Set whether to build bindings or not, will require SWIG
 option(AETHER_BUILD_BINDINGS "Build bindings for ${PROJECT}, will require SWIG" YES)
 
-# Add option for enabling or disabling the tests.
-option(AETHER_ENABLE_TESTS "Enable building of the tests." ON)
-
 # Set base install location
 add_project_config_parameter(INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} PATH "Set the base install prefix.")
 set(CMAKE_INSTALL_PREFIX ${AETHER_INSTALL_PREFIX} CACHE INTERNAL "Internlaise CMAKE_INSTALL_PREFIX, manipulate via AETHER_INSTALL_PREFIX" FORCE)
@@ -56,13 +53,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # All the source files for the library and bindings are located under this directory.
 add_subdirectory(src)
 
-if(AETHER_ENABLE_TESTS)
-  # Must enable testing at the lowest level in CMake.
-  enable_testing()
+# Must enable testing at the lowest level in CMake.
+enable_testing()
 
-  # All the tests for the library are located under this directory.
-  add_subdirectory(tests)
-endif()
+# All the tests for the library are located under this directory.
+add_subdirectory(tests)
 
 # If Sphinx was found we can add some targets for building the documentation.
 set(ADDITIONAL_GENERATED_FILES)

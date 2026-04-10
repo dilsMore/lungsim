@@ -11,7 +11,6 @@ module math_utilities
   use arrays
   use diagnostics
   use other_consts
-  use precision
 
   implicit none
   private
@@ -74,7 +73,7 @@ subroutine bessel_complex(z,bessel0,bessel1)
   a0 = abs (z)
   z1 = z
 !
-  if(abs(a0).le.zero_tol)then
+  if(a0.eq.0.0_dp)then
     bessel0 = cmplx(1.0_dp,0.0_dp,8)
     bessel1 = cmplx(0.0_dp,0.0_dp,8)
   endif
@@ -83,14 +82,14 @@ subroutine bessel_complex(z,bessel0,bessel1)
     z1 = -z
   endif
 !
-  if( a0 <= 18.0_dp ) then
+  if( a0 <= 18.0D+00 ) then
 
     bessel0 =cmplx(1.0_dp,0.0_dp,8)
     cr = cmplx(1.0_dp,0.0_dp,8)
     do k = 1,50
       cr = 0.25_dp*cr* z1**2/k**2
       bessel0 = bessel0+cr
-      if (abs (cr/bessel0).LT.1.0e-15_dp) then
+      if (abs (cr/bessel0).LT.1.0e-15) then
         exit
       endif
     enddo
@@ -100,7 +99,7 @@ subroutine bessel_complex(z,bessel0,bessel1)
     do k = 1,50
       cr = 0.25_dp*cr*z**2/(k*(k+1))
       bessel1 = bessel1+cr
-      if (abs (cr/bessel1).LT.1.0e-15_dp) then
+      if (abs (cr/bessel1).LT.1.0e-15) then
         exit
       endif
     enddo
@@ -109,9 +108,9 @@ subroutine bessel_complex(z,bessel0,bessel1)
 
   else
 
-    if ( a0 < 35.0_dp ) then
+    if ( a0 < 35.0D+00 ) then
       k0 = 12
-    else if ( a0 < 50.0_dp ) then
+    else if ( a0 < 50.0D+00 ) then
       k0 = 9
     else
       k0 = 7
@@ -157,7 +156,7 @@ end subroutine bessel_complex
     integer ( kind = 4 ) k1
     integer ( kind = 4 ) k2
 
-    w(1:n) = 0.0_dp
+    w(1:n) = 0.0D+00
 
     do i = 1, n
        k1 = ia(i)
@@ -226,17 +225,17 @@ end subroutine bessel_complex
           write ( *, '(a,i8)' ) '  I    = ', i
           stop
        end if
-       if ( abs(l(j)) .le. zero_tol ) then
+       if ( l(j) == 0.0D+00 ) then
           write ( *, '(a)' ) ' '
           write ( *, '(a)' ) 'ILU_CR - Fatal error!'
           write ( *, '(a,i8)' ) '  Zero pivot on step I = ', i
           write ( *, '(a,i8,a)' ) '  L(', j, ') = 0.0'
           stop
        end if
-       l(j) = 1.0_dp / l(j)
+       l(j) = 1.0D+00 / l(j)
     end do
 
-    l(ua(1:n)) = 1.0_dp / l(ua(1:n))
+    l(ua(1:n)) = 1.0D+00 / l(ua(1:n))
 
     return
   end subroutine ilu_cr
@@ -418,6 +417,7 @@ subroutine diagonal_pointer_cr ( n, ia, ja, ua )
   ! exit N contains the number of unique elements in the list.
   !
   subroutine sort_integer_list(N,IDATA)
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SORT_INTEGER_LIST" :: SORT_INTEGER_LIST
     integer :: IDATA(:),N
 
     !Local Variables
@@ -467,6 +467,7 @@ subroutine diagonal_pointer_cr ( n, ia, ja, ua )
   ! using a bubble sort algorithm.
 
   subroutine sort_real_list(n,RDATA,INDEX)
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_SORT_REAL_LIST" :: SORT_REAL_LIST
 
     integer :: INDEX(*),n
     real(dp) :: RDATA(*)

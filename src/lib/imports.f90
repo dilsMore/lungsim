@@ -36,6 +36,7 @@ contains
 ! has been saved in an exelem format as a single flow field (elements listed with
 ! ventilation as field values).
  subroutine import_ventilation(FLOWFILE)
+ !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_IMPORT_VENTILATION" :: IMPORT_VENTILATION
 
    character(len=MAX_FILENAME_LEN),intent(in) :: FLOWFILE
    !local variables
@@ -60,7 +61,6 @@ contains
    call sum_elem_field_from_periphery(ne_Vdot) !sum the air flows recursively UP the tree
    maxflow = elem_field(ne_Vdot,1)
 
-
    call enter_exit(sub_name,2)
  end subroutine import_ventilation
 
@@ -71,6 +71,7 @@ contains
 ! has been saved in an exelem format as a single flow field (elements listed with
 ! ventilation as field values).
  subroutine import_perfusion(FLOWFILE)
+ !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_IMPORT_PERFUSION" :: IMPORT_PERFUSION
 
    character(len=MAX_FILENAME_LEN),intent(in) :: FLOWFILE
    !local variables
@@ -103,6 +104,7 @@ contains
 !
 !>*import_exelemfield:* This subroutine reads in the content of an exelem field file (1 field)
  subroutine import_exelemfield(FLOWFILE,field_no)
+ !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_IMPORT_EXELEMFIELD" :: IMPORT_EXELEMFIELD
 
    character(len=MAX_FILENAME_LEN),intent(in) :: FLOWFILE
    integer, intent(in) :: field_no
@@ -128,6 +130,10 @@ contains
        if(flow.lt.0.0_dp) flow = zero_tol
          elem_field(field_no,ne) = flow! read it in
        end if
+
+!     if (ne .eq. ne+1)
+!       print *, "ERROR: Refined element number does not match with mesh."
+!     call exit(0)
        if(ne.ge.num_elems) exit read_elem_flow
      end do read_elem_flow
 

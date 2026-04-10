@@ -54,7 +54,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Ventilation'
-copyright = '2022, Lung Group ABI'
+copyright = '2015, Lung Group ABI'
 author = 'Lung Group ABI'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -71,7 +71,7 @@ release = '1.0.0'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language ='en' 
+language = None
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -300,5 +300,5 @@ texinfo_documents = [
 #texinfo_no_detailmenu = False
 
 #----- fortran source files
-fortran_src = ['../src/lib/']
+fortran_src = '../src/lib/'
 

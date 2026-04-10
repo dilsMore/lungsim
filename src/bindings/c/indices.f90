@@ -18,7 +18,11 @@ contains
 
     call strncpy(filename_f, PROBLEMTYPE, filename_len)
 
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_define_problem_type(filename_f)
+#else
     call define_problem_type(filename_f)
+#endif
 
   end subroutine define_problem_type_c
 
@@ -29,7 +33,11 @@ contains
     use indices, only: ventilation_indices
     implicit none
 
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_ventilation_indices()
+#else
     call ventilation_indices()
+#endif
 
   end subroutine ventilation_indices_c
 !
@@ -41,7 +49,11 @@ contains
     use indices, only: perfusion_indices
     implicit none
 
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_perfusion_indices()
+#else
     call perfusion_indices()
+#endif
 
   end subroutine perfusion_indices_c
 
@@ -64,5 +76,19 @@ contains
     res = get_nj_conc1()
 
   end function get_nj_conc1_c
+
+   !> particle indices
+  subroutine particle_indices_c() bind(C, name="particle_indices_c")
+
+    use indices, only: particle_indices
+    implicit none
+
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_particle_indices()
+#else
+    call particle_indices()
+#endif
+
+  end subroutine particle_indices_c
 
 end module indices_c

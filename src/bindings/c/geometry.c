@@ -12,20 +12,22 @@ void define_mesh_geometry_test_c(void);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
 void define_node_geometry_2d_c(const char *NODEFILE, int *filename_len);
 void define_data_geometry_c(const char *DATAFILE, int *filename_len);
-void import_node_geometry_2d_c(const char *NODEFILE, int *filename_len);
-void import_ply_triangles_c(const char *ply_file, int *filename_len);
-void internal_mesh_reorder_c();
-void list_tree_statistics_c(const char *filename, int *filename_len);
-extern void make_data_grid_c(int *elemlist_len, int elemlist[], int *num_target, double *offset, double *spacing);
+void group_elem_parent_term_c(int *ne_parent);
+void list_tree_c();
+void scale_radii_c(double *scale_factor);
+void scale_tree_c(const char *drn, int *drn_len, double *scale_factor);
+void make_data_grid_c(int *surface_elems, double *spacing, int *to_export, const char *filename, int *filename_len, const char *groupname, int *groupname_len);
 extern void make_2d_vessel_from_1d_c(int *elemlist_len, int elemlist[]);
-void define_rad_from_file_c(const char *FIELDFILE, int *filename_len, const char *radius_type, int *radius_type_len);
+void define_rad_from_file_c(const char *FIELDFILE, int *filename_len, double *constant_scale, const char *radius_type, int *radius_type_len);
 int get_local_node_f_c(const char *ndimension, int *dimension_len, const char *np_global, int *np_global_len);
 void define_rad_from_geom_c(const char *order_system, int *order_system_len, double *control_param,
                             const char *start_from, int *start_from_len, double *start_rad,
                             const char *group_type, int *group_type_len, const char *group_options, int *group_options_len);
-void occlude_vessel_c(int *VESSEL_NUMBER, double *RATIO);
 void element_connectivity_1d_c(void);
 void evaluate_ordering_c(void);
+void reorder_tree_c();
+void refine_1d_elements_c(int *elemlist_len, int elemlist[], int *nrefinements);
+void set_initial_volume_c(int *Gdirn, double *COV, double *total_volume, double *Rmax, double *Rmin);
 void volume_of_mesh_c(double *volume_model, double *volume_tree);
 void write_elem_geometry_2d_c(const char *ELEMFILE, int *filename_len);
 void write_geo_file_c(int *ntype, const char *GEOFILE, int *filename_len);
@@ -83,32 +85,32 @@ void define_data_geometry(const char *DATAFILE)
   define_data_geometry_c(DATAFILE, &filename_len);
 }
 
-void import_node_geometry_2d(const char *NODEFILE)
+void group_elem_parent_term(int ne_parent)
 {
-  int filename_len = (int)strlen(NODEFILE);
-  import_node_geometry_2d_c(NODEFILE, &filename_len);
+  group_elem_parent_term_c(&ne_parent);
 }
 
-void import_ply_triangles(const char *ply_file)
+void list_tree()
 {
-  int filename_len = (int)strlen(ply_file);
-  import_ply_triangles_c(ply_file, &filename_len);
+  list_tree_c();
 }
 
-void internal_mesh_reorder()
+void scale_radii(double scale_factor)
 {
-  internal_mesh_reorder_c();
+  scale_radii_c(&scale_factor);
 }
 
-void list_tree_statistics(const char *filename)
+void scale_tree(const char *drn, double scale_factor)
+{
+  int drn_len = (int)strlen(drn);
+  scale_tree_c(drn, &drn_len, &scale_factor);
+}
+
+void make_data_grid(int surface_elems, double spacing, int to_export, const char *filename, const char *groupname)
 {
   int filename_len = (int)strlen(filename);
-  list_tree_statistics_c(filename, &filename_len);
-}
-
-void make_data_grid(int elemlist_len, int elemlist[], int num_target, double offset, double spacing)
-{
-  make_data_grid_c(&elemlist_len, elemlist, &num_target, &offset, &spacing);
+  int groupname_len = (int)strlen(groupname);
+  make_data_grid_c(&surface_elems, &spacing, &to_export, filename, &filename_len, groupname, &groupname_len);
 }
 
 void make_2d_vessel_from_1d(int elemlist_len, int elemlist[])
@@ -116,11 +118,11 @@ void make_2d_vessel_from_1d(int elemlist_len, int elemlist[])
   make_2d_vessel_from_1d_c(elemlist, &elemlist_len);
 }
 
-void define_rad_from_file(const char *FIELDFILE, const char *radius_type)
+void define_rad_from_file(const char *FIELDFILE, double constant_scale, const char *radius_type)
 {
   int filename_len = (int)strlen(FIELDFILE);
   int radius_type_len = (int)strlen(radius_type);
-  define_rad_from_file_c(FIELDFILE, &filename_len, radius_type, &radius_type_len);
+  define_rad_from_file_c(FIELDFILE, &filename_len, &constant_scale, radius_type, &radius_type_len);
 }
 
 int get_local_node_f(const char *ndimension, const char *np_global)
@@ -142,13 +144,6 @@ void define_rad_from_geom(const char *order_system, double control_param, const 
 
 }
 
-void occlude_vessel(int VESSEL_NUMBER, double RATIO)
-{
-
-  occlude_vessel_c(&VESSEL_NUMBER, &RATIO);
-
-}
-
 void element_connectivity_1d()
 {
   element_connectivity_1d_c();
@@ -157,6 +152,21 @@ void element_connectivity_1d()
 void evaluate_ordering()
 {
   evaluate_ordering_c();
+}
+
+void reorder_tree()
+{
+  reorder_tree_c();
+}
+
+void refine_1d_elements(int elemlist_len, int elemlist[], int nrefinements)
+{
+  refine_1d_elements_c(&elemlist_len, elemlist, &nrefinements);
+}
+
+void set_initial_volume(int Gdirn, double COV, double total_volume, double Rmax, double Rmin)
+{
+  set_initial_volume_c(&Gdirn, &COV, &total_volume, &Rmax, &Rmin);
 }
 
 void volume_of_mesh(double *volume_model, double *volume_tree)
