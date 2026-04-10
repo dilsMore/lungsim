@@ -31,6 +31,7 @@ module ventilation
   public evaluate_uniform_flow
   public two_unit_test
   public sum_elem_field_from_periphery
+  public read_params_evaluate_flow
 
   real(dp),parameter,private :: gravity = 9.81e3_dp         ! mm/s2
 !!! for air
@@ -43,11 +44,12 @@ contains
 
   subroutine evaluate_vent
     !*evaluate_vent:* Sets up and solves dynamic ventilation model
+    !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_VENT" :: EVALUATE_VENT
 
     ! Local variables
     integer :: gdirn                  ! 1(x), 2(y), 3(z); upright lung (for our
     !                                   models) is z, supine is y.
-    integer :: iter_step,n,ne,num_brths,num_itns,nunit
+    integer :: i,iter_step,n,ne,ne1,num_brths,num_itns,nunit
     real(dp) :: chestwall_restvol     ! resting volume of chest wall
     real(dp) :: chest_wall_compliance ! constant compliance of chest wall
     real(dp) :: constrict             ! for applying uniform constriction
@@ -85,7 +87,7 @@ contains
 
     sub_name = 'evaluate_vent'
     call enter_exit(sub_name,1)
-
+    
 !!! Initialise variables:
     pmus_factor_in = 1.0_dp
     pmus_factor_ex = 1.0_dp
@@ -114,7 +116,7 @@ contains
     call update_elem_field(1.0_dp)
     call update_resistance
     call volume_of_mesh(init_vol,volume_tree)
-    
+
 !!! distribute the initial tissue unit volumes along the gravitational axis.
     call set_initial_volume(gdirn,COV,FRC*1.0e+6_dp,RMaxMean,RMinMean)
     undef = refvol * (FRC*1.0e+6_dp-volume_tree)/dble(elem_units_below(1))
@@ -161,7 +163,9 @@ contains
              ! modify driving muscle pressure by volume_target/sum_tidal
              ! this increases p_mus for volume_target>sum_tidal, and
              ! decreases p_mus for volume_target<sum_tidal
-             pmus_factor_in = pmus_factor_in * abs(volume_target/sum_tidal)
+
+              !!! tj - 27 mar 2025  - Preserve pressure, observe flow shift
+             !pmus_factor_in = pmus_factor_in * abs(volume_target/sum_tidal)
              pmus_factor_ex = pmus_factor_ex * abs(volume_target/sum_expid)
           endif
           sum_tidal = 0.0_dp !reset the tidal volume
@@ -208,8 +212,29 @@ contains
     enddo
     unit_field(nu_vent,:) = unit_field(nu_vt,:)/(Tinsp+Texpn)
     call sum_elem_field_from_periphery(ne_Vdot)
+
+    ! TJ - mar 27 2025 - Clip any negative flow to prevent backflow into distal elements
+    do ne = 1, num_elems
+      if (elem_field(ne_Vdot, ne) < 0.0_dp) then
+         elem_field(ne_Vdot, ne) = 0.0_dp
+      endif
+    enddo
+
     elem_field(ne_Vdot,1:num_elems) = &
          elem_field(ne_Vdot,1:num_elems)/elem_field(ne_Vdot,1)
+
+    elem_field(ne_Vdot0,:) = 0.0_dp
+    do ne = num_elems,1,-1
+       if(elem_cnct(1,0,ne).eq.0)then
+          elem_field(ne_Vdot0,ne) = elem_field(ne_Vdot,ne)
+       else
+          do i = 1,elem_cnct(1,0,ne)
+             ne1 = elem_cnct(1,i,ne)
+             elem_field(ne_Vdot0,ne) = elem_field(ne_Vdot0,ne) + elem_field(ne_Vdot0,ne1)
+          enddo
+          elem_field(ne_Vdot0,ne) = elem_field(ne_Vdot0,ne)/real(elem_cnct(1,0,ne))
+       endif
+    enddo
 
 !    call export_terminal_solution(TERMINAL_EXNODEFILE,'terminals')
 
@@ -318,6 +343,7 @@ contains
 
   subroutine evaluate_uniform_flow
     !*evaluate_uniform_flow:* Sets up and solves uniform ventilation model
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_UNIFORM_FLOW" :: EVALUATE_UNIFORM_FLOW
   
     ! Local variables
     integer :: ne,nunit
@@ -554,8 +580,8 @@ contains
             *(lambda**2+1.0_dp)/lambda**4)
        unit_field(nu_comp,nunit) = undef/unit_field(nu_comp,nunit) ! V/P
        ! add the chest wall (proportionately) in parallel
-       unit_field(nu_comp,nunit) = 1.0_dp/(1.0_dp/unit_field(nu_comp,nunit)&
-            +1.0_dp/(chest_wall_compliance/dble(num_units)))
+       !unit_field(nu_comp,nunit) = 1.0_dp/(1.0_dp/unit_field(nu_comp,nunit)&
+       !     +1.0_dp/(chest_wall_compliance/dble(num_units)))
        !estimate an elastic recoil pressure for the unit
        unit_field(nu_pe,nunit) = cc/2.0_dp*(3.0_dp*a+b)*(lambda**2.0_dp &
             -1.0_dp)*exp_term/lambda
@@ -659,6 +685,10 @@ contains
        ! element volume
        elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
             elem_field(ne_length,ne)
+
+       ! TJ - 04APR2023 - element surface areA
+       elem_field(ne_area,ne) = PI * elem_field(ne_radius,ne) * 2 * &
+            elem_field(ne_length,ne)
     enddo ! ne
     
     call enter_exit(sub_name,2)
@@ -668,7 +698,7 @@ contains
 !!!#############################################################################
 
   subroutine update_resistance
-
+    use mesh_utilities , only: cumulative_branch_length
     ! Local variables
     integer :: i,ne,ne2,np1,np2,nunit
     real(dp) :: ett_resistance,gamma,le,rad,resistance,reynolds,sum,zeta
@@ -707,7 +737,8 @@ contains
        reynolds = abs(elem_field(ne_Vdot,ne)*2.0_dp*GAS_DENSITY/ &
             (pi*elem_field(ne_radius,ne)*GAS_VISCOSITY))
        zeta = MAX(1.0_dp,dsqrt(2.0_dp*elem_field(ne_radius,ne)* &
-            reynolds/elem_field(ne_length,ne))*gamma)
+            !reynolds/elem_field(ne_length,ne))*gamma)
+            reynolds/cumulative_branch_length(ne))*gamma)
        elem_field(ne_resist,ne) = resistance * zeta
        elem_field(ne_t_resist,ne) = elem_field(ne_resist,ne) + &
             elem_field(ne_t_resist,ne)
@@ -897,7 +928,7 @@ contains
 
 !!!#############################################################################
 
-  subroutine read_params_evaluate_flow (gdirn, chest_wall_compliance, &
+  subroutine read_params_evaluate_flow(gdirn, chest_wall_compliance, &
        constrict, COV, FRC, i_to_e_ratio, pmus_step, press_in,&
        refvol, RMaxMean, RMinMean, T_interval, volume_target, expiration_type)
 
@@ -908,9 +939,9 @@ contains
     character,intent(out) :: expiration_type*(*)
 
     ! Local variables
-    character(len=100) :: buffer, label
+    character(len=100) :: buffer, ioerrmsg, label
     integer :: pos
-    integer, parameter :: fh = 15
+    integer, parameter :: fh = 95
     integer :: ios
     integer :: line
     character(len=60) :: sub_name
@@ -936,14 +967,15 @@ contains
     !    expiration_type = 'passive' ! or 'active'
     !    chest_wall_compliance = 0.2e6_dp/98.0665_dp !(0.2 L/cmH2O --> mm^3/Pa)
 
-    open(fh, file='Parameters/params_evaluate_flow.txt')
+    open(fh, file='Parameters/params_evaluate_flow.txt', status='OLD')
 
     ! ios is negative if an end of record condition is encountered or if
     ! an endfile condition was detected.  It is positive if an error was
     ! detected.  ios is zero otherwise.
 
     do while (ios == 0)
-       read(fh, '(A)', iostat=ios) buffer
+       read(fh, '(A)', iostat=ios, iomsg=ioerrmsg) buffer
+       
        if (ios == 0) then
           line = line + 1
 
@@ -1009,6 +1041,7 @@ contains
 !!!#############################################################################
 
   subroutine two_unit_test
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_TWO_UNIT_TEST" :: TWO_UNIT_TEST
 
     ! Local variables
     integer ne,noelem,nonode,np

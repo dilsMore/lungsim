@@ -12,5 +12,6 @@ subroutine testSetDiagnostics()
    call get_diagnostics_on(state)
    @assertTrue(state)
 
+
 end subroutine testSetDiagnostics
 

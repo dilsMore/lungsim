@@ -8,7 +8,7 @@ void ventilation_indices_c();
 void perfusion_indices_c();
 int get_ne_radius_c();
 int get_nj_conc1_c();
-
+void particle_indices_c();
 
 
 void define_problem_type(const char *PROBLEMTYPE)
@@ -36,4 +36,10 @@ int get_ne_radius()
 int get_nj_conc1()
 {
   return get_nj_conc1_c();
+}
+
+
+void particle_indices()
+{
+  particle_indices_c();
 }

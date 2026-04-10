@@ -6,7 +6,11 @@ contains
     use filenames, only : read_geometry_evaluate_flow
     implicit none
 
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_read_geometry_evaluate_flow()
+#else
     call read_geometry_evaluate_flow()
+#endif
 
   end subroutine read_geometry_evaluate_flow_c
 
@@ -15,7 +19,11 @@ contains
     use filenames, only : read_geometry_main
     implicit none
 
+#if defined _WIN32 && defined __INTEL_COMPILER
+    call so_read_geometry_main()
+#else
     call read_geometry_main()
+#endif
 
   end subroutine read_geometry_main_c
 

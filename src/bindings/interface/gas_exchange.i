@@ -7,5 +7,4 @@
 #include "gas_exchange.h"
 %}
 
-%include gas_exchange.h
 

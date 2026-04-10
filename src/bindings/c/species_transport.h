@@ -3,6 +3,6 @@
 
 #include "symbol_export.h"
 
-SHO_PUBLIC void initialise_transport();
+SHO_PUBLIC void initialise_exchange();
 
 #endif /* AETHER_SPECIES_TRANSPORT_H */

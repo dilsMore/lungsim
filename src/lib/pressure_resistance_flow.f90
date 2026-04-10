@@ -17,8 +17,7 @@ module pressure_resistance_flow
   use solve, only: BICGSTAB_LinSolv,pmgmres_ilu_cr
 
   implicit none
-  integer,allocatable :: occ_list(:),compl_list(:)
-
+  
   !Module parameters
 
   !Module types
@@ -27,12 +26,13 @@ module pressure_resistance_flow
 
   !Interfaces
   private
-  public evaluate_prq,calculate_ppl,occlusion_list,compliance_list
+  public evaluate_prq,calculate_ppl
 contains
 !###################################################################################
 !
 !*evaluate_PRQ:* Solves for pressure and flow in a rigid or compliant tree structure
-  subroutine evaluate_prq(mesh_type,vessel_type,grav_dirn,grav_factor,bc_type,inlet_bc,outlet_bc,remodeling_grade)
+  subroutine evaluate_prq(mesh_type,vessel_type,grav_dirn,grav_factor,bc_type,inlet_bc,outlet_bc)
+  !DEC$ ATTRIBUTES DLLEXPORT,ALIAS:"SO_EVALUATE_PRQ" :: EVALUATE_PRQ
 
     !local variables
     integer :: mesh_dof,depvar_types
@@ -48,7 +48,6 @@ contains
     integer :: num_vars,NonZeros,MatrixSize
     integer :: AllocateStatus
 
-    real(dp), intent(in) :: remodeling_grade ! Remodeling if applicable, 0 stands for healthy and anything from 10 to 100 is hypertension
     real(dp), allocatable :: prq_solution(:,:),solver_solution(:)
     real(dp) :: viscosity,density,inlet_bc,outlet_bc,inletbc,outletbc,grav_vect(3),gamma,total_resistance,ERR
     logical, allocatable :: FIX(:)
@@ -180,7 +179,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
     KOUNT=0
 !! Calculate resistance of each element
    call calculate_resistance(viscosity,KOUNT)
-
+        
 !! Calculate sparsity structure for solution matrices
     !Determine size of and allocate solution vectors/matrices
     call calc_sparse_size(mesh_dof,depvar_at_elem,depvar_at_node,FIX,NonZeros,MatrixSize)
@@ -247,7 +246,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
 !! ----CALL SOLVER----
       call pmgmres_ilu_cr(MatrixSize, NonZeros, SparseRow, SparseCol, SparseVal, &
          solver_solution, RHS, 500, 500,1.d-5,1.d-4,SOLVER_FLAG)
-       if(SOLVER_FLAG == 0)then
+       if(SOLVER_FLAG == 0)then 
           print *, 'Warning: pmgmres has reached max iterations. Solution may not be valid if this warning persists'
        elseif(SOLVER_FLAG ==2)then
           print *, 'ERROR: pmgmres has failed to converge'
@@ -284,7 +283,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
       else
 !Update vessel radii based on predicted pressures and then update resistance through tree
         call calc_press_area(grav_vect,KOUNT,depvar_at_node,prq_solution,&
-           mesh_dof,vessel_type,elasticity_parameters,mechanics_parameters,remodeling_grade)
+           mesh_dof,vessel_type,elasticity_parameters,mechanics_parameters)
         call calculate_resistance(viscosity,KOUNT)
 
 !Put the ladder stuff here --> See solve11.f
@@ -386,7 +385,7 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
     logical:: ADD
     logical :: FIX(mesh_dof)
     character(len=60) ::bc_type,mesh_type
-
+ 
   ! local variables
     integer :: nonode,np,ne,ny1,nj,np_in
     real(dp) :: grav
@@ -398,12 +397,12 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
      ! Initial values
      FIX(1:mesh_dof)=.FALSE.
      prq_solution = 0
-     ! Fixed boundary conditions
+     ! Fixed boundary conditions  
      ! These are inlet BCs, apply to all inlet BCs (there should only be one)
      do ne=1,num_elems
         !ne=elems(noelem)
         if (elem_cnct(-1,0,ne) == 0) THEN !Entry element
-           if(BC_TYPE == 'pressure')THEN
+           if(BC_TYPE == 'pressure')THEN          
               np=elem_nodes(1,ne)
               ny1=depvar_at_node(np,1,1) !for fixed pressure BC
               FIX(ny1)=.TRUE. !set fixed
@@ -451,65 +450,6 @@ gamma = 0.327_dp !=1.85/(4*sqrt(2))
   endif
     call enter_exit(sub_name,2)
   end subroutine boundary_conditions
-
-!
-!###################################################################################
-!
-  !* occlusion_list gets an element list from user which includes the element that were
-  ! occluded for CTEPH and now the occlusions are removed and we want to make sure there
-  ! is no remodelling downstream of those elements
-  subroutine occlusion_list(elem_list)
-
-    integer,intent(in) :: elem_list(:) ! list of surface elements defining the host region
-  !local variables
-    integer :: i
-    character(len=60) :: sub_name
-
-    sub_name = 'occlusion_list'
-    call enter_exit(sub_name,1)
-
-    if(count(elem_list.ne.0).gt.0)then ! a surface element list is given for converting to
-       !                                 create a list of occluded elements
-       allocate(occ_list(count(elem_list.ne.0)))
-       !!! get the list of occlusion list from the given list
-       do i = 1,count(elem_list.ne.0)
-          occ_list(i) = elem_list(i)
-       enddo
-    endif
-    !
-    ! write(*,*) 'occlusion_list:', occ_list
-    ! pause
-
-
-    call enter_exit(sub_name,2)
-    end subroutine occlusion_list
-!
-!###################################################################################
-!
-  !* compliance_list gets an element list from user which includes the element that were
-  ! occluded for CTEPH the compliance of these vessels is reduced to zero - basically make these
-  ! vessels rigid
-  subroutine compliance_list(elem_list2)
-
-    integer,intent(in) :: elem_list2(:) ! list of surface elements defining the host region
-  !local variables
-    integer :: i
-    character(len=60) :: sub_name
-
-    sub_name = 'compliance_list'
-    call enter_exit(sub_name,1)
-
-    if(count(elem_list2.ne.0).gt.0)then ! a surface element list is given for converting to
-       !                                 create a list of occluded elements
-       allocate(compl_list(count(elem_list2.ne.0)))
-       !!! get the list of occlusion list from the given list
-       do i = 1,count(elem_list2.ne.0)
-          compl_list(i) = elem_list2(i)
-       enddo
-    endif
-
-    call enter_exit(sub_name,2)
-  end subroutine compliance_list
 !
 !###################################################################################
 !
@@ -536,7 +476,7 @@ subroutine calculate_resistance(viscosity,KOUNT)
             node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
             node_xyz(3,np1))**2)
        elem_field(ne_radius,ne)=(elem_field(ne_radius_in,ne)+elem_field(ne_radius_out,ne))/2.0_dp
-       ! element Poiseuille (laminar) resistance in units of Pa.s.mm-3
+       ! element Poiseuille (laminar) resistance in units of Pa.s.mm-3        
        resistance = 8.d0*viscosity*elem_field(ne_length,ne)/ &
             (PI*elem_field(ne_radius,ne)**4) !laminar resistance
        ! element turbulent resistance (flow in bifurcating tubes)
@@ -551,7 +491,7 @@ subroutine calculate_resistance(viscosity,KOUNT)
        endif
        !print *,"TESTING RESISTANCE",ne,elem_field(ne_resist,ne),elem_field(ne_radius,ne),elem_ordrs(2,ne)
       !endif
-    enddo
+    enddo 
 
     call enter_exit(sub_name,2)
   end subroutine calculate_resistance
@@ -572,17 +512,17 @@ subroutine calculate_resistance(viscosity,KOUNT)
      integer :: depvar_totals(0:2,2)
      integer :: num_vars
 !     local variables
-    integer :: ny_start=0
+    integer :: ny_start=0  
     integer :: nc,ne,nn,np,nrc,ny
 
     sub_name = 'calc_depvar_maps'
     call enter_exit(sub_name,1)
-
+     
      depvar_totals = 0
      mesh_from_depvar = 0
      depvar_at_elem = 0
      depvar_at_node = 0
-
+     
 !nrc = loops from 0,1,2
 
 !  Set up mapping arrays for current region:
@@ -630,7 +570,7 @@ subroutine calculate_resistance(viscosity,KOUNT)
                  mesh_from_depvar(1,ny,nrc)=nc
                  mesh_from_depvar(2,ny,nrc)=ne
               endif
-           enddo !noelem (ne)
+           enddo !noelem (ne)          
         enddo !nc
      enddo !nrc
      num_vars=ny
@@ -663,7 +603,7 @@ subroutine calculate_resistance(viscosity,KOUNT)
          ne2=elem_cnct(1,num2,ne)
          invres=invres+1.0_dp/elem_res(ne2)
       enddo
-      if(elem_cnct(1,0,ne).gt.0)then
+      if(elem_cnct(1,0,ne).gt.0)then 
         elem_res(ne)=elem_res(ne)+1.0_dp/invres
        endif
     enddo
@@ -944,7 +884,7 @@ subroutine calc_sparse_size(mesh_dof,depvar_at_elem,depvar_at_node,FIX,NonZeros,
     sub_name = 'calc_sparse_size'
     call enter_exit(sub_name,1)
 
-
+ 
     fixed_variables = 0
     !count fixed variables
     do i=1,mesh_dof
@@ -981,21 +921,18 @@ subroutine calc_sparse_size(mesh_dof,depvar_at_elem,depvar_at_node,FIX,NonZeros,
 !*calc_press_area:* Calculates new radii based on pressure area relnships
 
 subroutine calc_press_area(grav_vect,KOUNT,depvar_at_node,prq_solution,&
-    mesh_dof,vessel_type,elasticity_parameters,mechanics_parameters,remodeling_grade)
+    mesh_dof,vessel_type,elasticity_parameters,mechanics_parameters)
 
     character(len=60), intent(in) :: vessel_type
     real(dp), intent(in) :: grav_vect(3)
     integer,intent(in) :: KOUNT,mesh_dof
     integer,intent(in) :: depvar_at_node(num_nodes,0:2,2)
-    real(dp),intent(in) ::  prq_solution(mesh_dof,2),remodeling_grade
+    real(dp),intent(in) ::  prq_solution(mesh_dof,2)
     real(dp),intent(in) :: elasticity_parameters(3),mechanics_parameters(2)
 
 !local variables
-    integer :: nj,np,ne,ny,nn,k,no_compl_ne
-    real(dp) :: h,Ptm,R0,Pblood,Ppl,counter,cc1,cc2,cc3
-    real(dp) :: alt_hyp,alt_fib,prox_fib,narrow_rad_one,narrow_rad_two,narrow_factor,prune_rad,prune_fraction,counter1,counter2
-    integer,allocatable :: templss(:)
-    logical:: check, FOUND
+    integer :: nj,np,ne,ny,nn
+    real(dp) :: h,Ptm,R0,Pblood,Ppl
 
     character(len=60) :: sub_name
     sub_name = 'calc_press_area'
@@ -1007,7 +944,6 @@ subroutine calc_press_area(grav_vect,KOUNT,depvar_at_node,prq_solution,&
       enddo !elems
     endif
 
-  if(remodeling_grade.eq.0.0_dp) then  ! Solving for Healthy
     do ne=1,num_elems
       do nn=1,2
         if(nn.eq.1) np=elem_nodes(1,ne)
@@ -1018,374 +954,54 @@ subroutine calc_press_area(grav_vect,KOUNT,depvar_at_node,prq_solution,&
         Ptm=Pblood+Ppl     ! Pa
         if(nn.eq.1)R0=elem_field(ne_radius_in0,ne)
         if(nn.eq.2)R0=elem_field(ne_radius_out0,ne)
-        if(vessel_type.eq.'elastic_g0_beta')then
-          if(Ptm.lt.elasticity_parameters(3).and.elasticity_parameters(1).gt.0.0_dp)then
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-          elseif(Ptm.lt.0.0_dp.or.elasticity_parameters(1).LT.TOLERANCE)then
-            if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-          else !ptm>ptmmax
-            if(nn.eq.1)then
-               elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                 **(1.d0/elasticity_parameters(2))
-            endif
-            if(nn.eq.2)then
-              elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                **(1.d0/elasticity_parameters(2))
-            endif
+      if(vessel_type.eq.'elastic_g0_beta')then
+        if(Ptm.lt.elasticity_parameters(3).and.elasticity_parameters(1).gt.0.0_dp)then
+          if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
+          if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
+        elseif(Ptm.lt.0.0_dp.or.elasticity_parameters(1).LT.TOLERANCE)then
+          if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
+          if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
+          if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
+        else!ptm>ptmmax
+          if(nn.eq.1)then
+             elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
+               **(1.d0/elasticity_parameters(2))
           endif
-        elseif(vessel_type.eq.'elastic_alpha')then
-           if(Ptm.LT.elasticity_parameters(2))then
-             if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-             if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-           elseif(Ptm.lt.0.0_dp)then
-            if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-           else !ptm>ptmmax
-              if(nn.eq.1)then
-               elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-              endif
-              if(nn.eq.2)then
-                elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-              endif
+          if(nn.eq.2)then
+            elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
+              **(1.d0/elasticity_parameters(2))
           endif
-        elseif(vessel_type.eq.'elastic_hooke')then
-          h=elasticity_parameters(2)*R0
-          if(nn.eq.1) elem_field(ne_radius_in,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h)
-          if(nn.eq.2) elem_field(ne_radius_out,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h)
-        else
+        endif
+      elseif(vessel_type.eq.'elastic_alpha')then
+         if(Ptm.LT.elasticity_parameters(2))then
+          if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
+          if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
+        elseif(Ptm.lt.0.0_dp)then
+          if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
+          if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
+          if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
+        else!ptm>ptmmax
+          if(nn.eq.1)then
+             elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
+          endif
+          if(nn.eq.2)then
+            elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
+          endif
+        endif
+      elseif(vessel_type.eq.'elastic_hooke')then
+        h=elasticity_parameters(2)*R0
+        if(nn.eq.1) elem_field(ne_radius_in,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h)
+        if(nn.eq.2) elem_field(ne_radius_out,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h)
+      else
         print *, 'no vessel type defined, assuming rigid'
         if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
         if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
       endif
       enddo!nn
     enddo!ne
-  else ! Solving for remodeling case - only implemented for elastic_alpha
 
-    if(remodeling_grade.ge.60)then  ! hypertophy effect
-      alt_hyp = 1.0_dp/6
-    else
-      alt_hyp = (-1.0_dp/60)*remodeling_grade + 7.0_dp/6
-    endif
 
-    ! Narrowing effect
-    narrow_rad_one=0.015_dp
-    narrow_rad_two=0.15_dp
-    if(remodeling_grade.le.20.0_dp)then
-      narrow_factor = 1.0_dp
-    elseif(remodeling_grade.ge.60.0_dp)then
-      narrow_factor = 0.55_dp
-    else
-      narrow_factor = (-9.0_dp/800) * remodeling_grade + 1.225_dp
-    endif
 
-    ! pruning fraction
-    if(remodeling_grade.le.20.0_dp)then
-      prune_fraction = 0
-      prune_rad = 0.16_dp
-    elseif(remodeling_grade.ge.50.0_dp)then
-      prune_rad = 0.25_dp
-      prune_fraction = (1.0_dp/160) * remodeling_grade - 1.0_dp/8
-    else
-      prune_rad = 0.16_dp
-      prune_fraction = (1.0_dp/160) * remodeling_grade - 1.0_dp/8
-    endif
-
-    ! fibrosis effect
-    if(remodeling_grade.le.50.0_dp)then
-      alt_fib = 1.0_dp
-    else
-      alt_fib = (-1.0_dp/60) * remodeling_grade + 11.0_dp/6
-    endif
-    counter=0.0_dp
-    cc1=0.0_dp
-    cc2=0.0_dp
-    cc3=0.0_dp
-    counter1 = 1.0_dp
-    counter2 = 1.0_dp
-    do ne=1,num_elems
-      do nn=1,2
-        if(nn.eq.1) np=elem_nodes(1,ne)
-        if(nn.eq.2) np=elem_nodes(2,ne)
-        ny=depvar_at_node(np,0,1)
-        call calculate_ppl(np,grav_vect,mechanics_parameters,Ppl)
-        Pblood=prq_solution(ny,1) !Pa
-        Ptm=Pblood+Ppl     ! Pa
-        if(nn.eq.1) R0=elem_field(ne_radius_in0,ne)
-        if(nn.eq.2) R0=elem_field(ne_radius_out0,ne)
-        if(elem_field(ne_group,ne).eq.0.0_dp) then !only applying on arteries
-          FOUND = .False.
-          if (allocated(occ_list))then
-            do k=1,count(occ_list.ne.0)
-              check = is_downstream(ne,occ_list(k))
-              if(check)then
-                FOUND = .True.
-              endif
-            end do
-          endif
-          if(.NOT.FOUND)then ! FOUND
-            if(nn.eq.1) then ! nn.eq.1
-              if(R0.lt.prune_rad.and.elem_ordrs(no_sord,ne).eq.1) then
-                if(counter1/100.le.prune_fraction) then ! pruning the right percentage based on the fraction defined
-                  cc1 = cc1+1.0_dp
-                  R0=0.005_dp ! Setting the radius to a small value
-                else ! the remaining of the canditates that are not pruned because of the fraction
-                  R0=elem_field(ne_radius_in0,ne)
-                endif
-                counter1 = counter1 + 1.0_dp ! since a canditate was found, one is added to the counter1
-                if(counter1.ge.101.0_dp) counter1=1.0_dp ! now that the fraction out of hundred was blocked set the counter back to start
-              else ! R0 greater than prune_rad
-                cc3=cc3+1.0_dp
-                R0=elem_field(ne_radius_in0,ne) ! treating the artery as normal unstrained radius (no constraints)
-              endif
-            endif ! nn.eq.1
-            if(nn.eq.2) then  ! same thing as nn=1
-              if(R0.lt.prune_rad.and.elem_ordrs(no_sord,ne).eq.1) then
-                if(counter2/100.le.prune_fraction) then
-                  cc2=cc2+1.0_dp
-                  R0=0.005_dp
-                else
-                  R0=elem_field(ne_radius_out0,ne)
-                endif
-                counter2 = counter2 + 1.0_dp
-                if(counter2.ge.101.0_dp) counter2=1.0_dp
-              else
-                R0=elem_field(ne_radius_out0,ne)
-              endif
-            endif ! same thing as nn=1
-          else ! treat as healthy
-            if(nn.eq.1) R0=elem_field(ne_radius_in0,ne)
-            if(nn.eq.2) R0=elem_field(ne_radius_out0,ne)
-          endif ! FOUND
-          if(vessel_type.eq.'elastic_g0_beta') then ! elastic_g0_beta
-            if(elem_field(ne_group,ne).eq.0.0_dp) then !only applying on arteries
-              if(Ptm.LT.elasticity_parameters(3).and.elasticity_parameters(1).gt.0.0_dp)then
-                if(nn.eq.1) then
-                  if((R0.gt.0.015).and.(R0.lt.0.15)) then
-                    elem_field(ne_radius_in,ne)=0.55_dp*R0*((Ptm/(0.16_dp*elasticity_parameters(1)))+1.d0) &
-                    **(1.d0/elasticity_parameters(2))
-                  else
-                    elem_field(ne_radius_in,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-                  endif
-                endif
-                if(nn.eq.2) then
-                  if((R0.gt.0.015).and.(R0.lt.0.15)) then
-                    elem_field(ne_radius_out,ne)=0.55_dp*R0*((Ptm/(0.16_dp*elasticity_parameters(1)))+1.d0) &
-                    **(1.d0/elasticity_parameters(2))
-                  else
-                    elem_field(ne_radius_out,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-                  endif
-                endif
-              elseif(Ptm.lt.0.0_dp.or.elasticity_parameters(1).LT.TOLERANCE)then
-                if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-                if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-                if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-              else !ptm>ptmmax
-                if(nn.eq.1) then
-                  if((R0.gt.0.015).and.(R0.lt.0.15)) then
-                    elem_field(ne_radius_in,ne)=0.55_dp*R0*((elasticity_parameters(3)/(0.16_dp*elasticity_parameters(1)))+1.d0) &
-                   **(1.d0/elasticity_parameters(2))
-                  else
-                    elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                   **(1.d0/elasticity_parameters(2))
-                  endif
-                endif
-                if(nn.eq.2) then
-                  if((R0.gt.0.015).and.(R0.lt.0.15)) then
-                    elem_field(ne_radius_out,ne)=0.55_dp*R0*((elasticity_parameters(3)/(0.16_dp*elasticity_parameters(1)))+1.d0) &
-                    **(1.d0/elasticity_parameters(2))
-                  else
-                    elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                    **(1.d0/elasticity_parameters(2))
-                  endif
-                endif
-              endif
-            else !other than arteries
-              if(Ptm.LT.elasticity_parameters(3).and.elasticity_parameters(1).gt.0.0_dp)then
-                if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-                if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm/elasticity_parameters(1))+1.d0)**(1.d0/elasticity_parameters(2))
-              elseif(Ptm.lt.0.0_dp.or.elasticity_parameters(1).LT.TOLERANCE)then
-                if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-                if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-                if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-              else !ptm>ptmmax
-                if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                **(1.d0/elasticity_parameters(2))
-                if(nn.eq.2)then
-                  elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(3)/elasticity_parameters(1))+1.d0) &
-                  **(1.d0/elasticity_parameters(2))
-                endif
-              endif
-            endif !artery or vein
-          elseif(vessel_type.eq.'elastic_alpha') then ! elastic alpha
-            !if(elem_field(ne_group,ne).eq.0.0_dp) then !only applying on arteries  BEN WAS HERE
-              FOUND = .False.
-              if (allocated(occ_list))then ! occ allocated
-                do k=1,count(occ_list.ne.0)
-                  check = is_downstream(ne,occ_list(k))
-                  if(check)then
-                    FOUND = .True.
-                  endif
-                end do
-              endif ! occ allocated
-              if(.NOT.FOUND)then !FOUND
-                if(Ptm.lt.elasticity_parameters(2))then
-                  if(nn.eq.1) then ! nn.eq.1
-                    if((R0.gt.narrow_rad_one).and.(R0.lt.0.5_dp)) then ! Hypertorphy+narrow factor effect
-                      if(R0.lt.0.05_dp) then ! only Narrow_factor
-                        elem_field(ne_radius_in,ne) = narrow_factor*R0*((Ptm*elasticity_parameters(1))+1.d0)
-                      elseif(R0.gt.narrow_rad_two) then ! only Hypertophy
-                        elem_field(ne_radius_in,ne) = R0*((Ptm*alt_hyp*elasticity_parameters(1))+1.d0)
-                      else ! Both hypertophy and narrowing
-                        elem_field(ne_radius_in,ne) = narrow_factor*R0*((Ptm*alt_hyp*alt_fib*elasticity_parameters(1))+1.d0)
-                      endif
-                    elseif(R0.gt.0.5_dp) then !Not within the range of our target radii, hence, no remodeling for this element
-                      elem_field(ne_radius_in,ne) = R0*((Ptm*elasticity_parameters(1))+1.d0)
-                    else !Pruning
-                      elem_field(ne_radius_in,ne) = R0
-                    endif
-                  endif ! nn.eq.1
-                  if(nn.eq.2) then ! nn.eq.2
-                    if((R0.gt.narrow_rad_one).and.(R0.lt.0.5_dp)) then ! Hypertorphy+narrow factor effect
-                      if(R0.lt.0.05_dp) then ! only Narrow_factor
-                        elem_field(ne_radius_out,ne) = narrow_factor*R0*((Ptm*elasticity_parameters(1))+1.d0)
-                      elseif(R0.gt.narrow_rad_two) then ! hypertophy only
-                        elem_field(ne_radius_out,ne) = R0*((Ptm*alt_hyp*elasticity_parameters(1))+1.d0)
-                      else ! Both hypertophy and narrowing
-                        elem_field(ne_radius_out,ne) = narrow_factor*R0*((Ptm*alt_hyp*alt_fib*elasticity_parameters(1))+1.d0)
-                      endif
-                    elseif(R0.gt.0.5_dp) then !Not within the range of our target radii, hence, no remodeling
-                        elem_field(ne_radius_out,ne) = R0*((Ptm*elasticity_parameters(1))+1.d0)
-                    else !Pruning
-                      elem_field(ne_radius_out,ne) = R0
-                    endif
-                  endif ! nn.eq.2
-                  if (allocated(compl_list)) then ! compl allocated
-                    do no_compl_ne=1,count(compl_list.ne.0)
-                      !pause
-                      if(ne.eq.compl_list(no_compl_ne))then
-                        if(nn.eq.1) elem_field(ne_radius_in,compl_list(no_compl_ne))=R0!*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                        if(nn.eq.2) elem_field(ne_radius_out,compl_list(no_compl_ne))=R0!*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                      endif
-                    end do
-                  endif ! compl allocated
-                elseif(Ptm.lt.0.0_dp)then !Ptm
-                    if(Ptm.lt.0) write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-                    if(nn.eq.1) then ! nn.eq.1
-                      if((R0.gt.narrow_rad_one).and.(R0.lt.0.5)) then ! Hypertophy+narrowing effect
-                        if(R0.lt.narrow_rad_two) then !only narrowing
-                          elem_field(ne_radius_in,ne)=narrow_factor*R0
-                        else
-                          elem_field(ne_radius_in,ne)=R0
-                        endif
-                      else  ! Not within the target range, hence, no remodeling
-                        elem_field(ne_radius_in,ne)=R0
-                      endif
-                    endif ! nn.eq.1
-                    if(nn.eq.2) then ! nn.eq.2
-                      if((R0.gt.narrow_rad_one).and.(R0.lt.0.5_dp)) then
-                        if(R0.lt.narrow_rad_two) then
-                          elem_field(ne_radius_out,ne)=narrow_factor*R0
-                        else
-                          elem_field(ne_radius_out,ne)=R0
-                        endif
-                      else ! Not within the target range, hence, no remodeling
-                        elem_field(ne_radius_out,ne)=R0
-                      endif
-                    endif ! nn.eq.2
-                else !ptm>ptmmax
-                    if(nn.eq.1) then ! nn.eq.1
-                      if((R0.gt.narrow_rad_one).and.(R0.lt.0.5_dp)) then ! Hypertophy+narrowing effect
-                        if(R0.lt.0.05_dp) then ! only Narrow_factor
-                          elem_field(ne_radius_in,ne) = narrow_factor*R0*((Ptm*alt_hyp*alt_fib*elasticity_parameters(1))+1.d0)
-                        elseif(R0.gt.narrow_rad_two) then ! hypertophy only
-                          elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*alt_hyp*elasticity_parameters(1))+1.d0)
-                        else ! Both hypertophy and narrowing
-                          elem_field(ne_radius_in,ne)=narrow_factor*R0*(elasticity_parameters(2)* &
-                          alt_hyp*alt_fib*elasticity_parameters(1)+1.d0)
-                        endif
-                      elseif(R0.gt.0.5_dp) then ! Not within the target range, hence, no remodeling
-                          elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*(elasticity_parameters(1)))+1.d0)
-                      else
-                        elem_field(ne_radius_in,ne)=R0
-                      endif
-                    endif ! nn.eq.1
-                    if(nn.eq.2) then ! nn.eq.2
-                      if((R0.gt.narrow_rad_one).and.(R0.lt.0.5_dp)) then ! Hypertrophy+narrowing effect
-                        if(R0.lt.0.05_dp) then ! only Narrow_factor
-                          elem_field(ne_radius_out,ne)=narrow_factor*R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-                        elseif(R0.gt.narrow_rad_two) then ! hypertophy only
-                          elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*alt_hyp*elasticity_parameters(1))+1.d0)
-                        else ! Both hypertophy and narrowing
-                          elem_field(ne_radius_out,ne)=narrow_factor*R0*((elasticity_parameters(2)* &
-                          alt_hyp*alt_fib*elasticity_parameters(1))+1.d0)
-                        endif
-                      elseif(R0.gt.0.5_dp) then ! Not within the target range, hence, no remodeling
-                          elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*(elasticity_parameters(1)))+1.d0)
-                      else
-                        elem_field(ne_radius_out,ne)=R0
-                      endif ! radius criteria
-                    endif ! nn.eq.2
-                    if (allocated(compl_list)) then ! compl allocated
-                      do no_compl_ne=1,count(compl_list.ne.0)
-                        !pause
-                        if(ne.eq.compl_list(no_compl_ne))then
-                          if(nn.eq.1) elem_field(ne_radius_in,compl_list(no_compl_ne))=R0!*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                          if(nn.eq.2) elem_field(ne_radius_out,compl_list(no_compl_ne))=R0!*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                        endif
-                      end do
-                    endif ! compl allocated
-                endif !ptm
-              else ! FOUND
-                if(Ptm.lt.elasticity_parameters(2))then
-                  if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-                  if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-                elseif(Ptm.lt.0.0_dp)then !Ptm
-                  if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-                  if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-                  if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-                else !ptm>ptmmax
-                  if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-                  if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-                endif
-              endif ! FOUND
-              if (allocated(compl_list)) then ! compl allocated
-                do no_compl_ne=1,count(compl_list.ne.0)
-                  ! pause
-                  if(ne.eq.compl_list(no_compl_ne))then
-                    if(nn.eq.1) elem_field(ne_radius_in,compl_list(no_compl_ne))=R0*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                    if(nn.eq.2) elem_field(ne_radius_out,compl_list(no_compl_ne))=R0*((Ptm*elasticity_parameters(1)*0.0)+1.d0)
-                  endif
-                end do
-              endif ! compl allocated
-          elseif(vessel_type.eq.'elastic_hooke')then
-            h=elasticity_parameters(2)*R0
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h)
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0+3.0_dp*R0**2*Ptm/(4.0_dp*elasticity_parameters(1)*h) !vessel type
-          else
-            print *, 'no vessel type defined, assuming rigid'
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0 !vessel type
-          endif !vessel type
-        else !other than arteries
-          if(Ptm.lt.elasticity_parameters(2))then
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((Ptm*elasticity_parameters(1))+1.d0)
-          elseif(Ptm.lt.0.0_dp)then !Ptm
-            if(Ptm.lt.0)write(*,*) 'Transmural pressure < zero',ne,Ptm,Pblood,Ppl
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0
-          else !ptm>ptmmax
-            if(nn.eq.1) elem_field(ne_radius_in,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-            if(nn.eq.2) elem_field(ne_radius_out,ne)=R0*((elasticity_parameters(2)*elasticity_parameters(1))+1.d0)
-          endif
-        endif ! if artery
-      enddo!nn
-    enddo!ne
-  endif
 
 call enter_exit(sub_name,2)
 end subroutine calc_press_area
@@ -1416,36 +1032,6 @@ subroutine map_solution_to_mesh(prq_solution,depvar_at_elem,depvar_at_node,mesh_
 
     call enter_exit(sub_name,2)
 end subroutine map_solution_to_mesh
-
-!##############################################################################!##############################################################################
-!
-!*is_downstream* checks to see if a certain element is downstream of another element
-!!!!!!!
-! This function is useful for doing regional remodeling where you do not want to
-! remodel vessels downstream of an occlusion (needed for post-PEA modelling)
-!!!!!!!
-recursive function is_downstream(ne,occ_ne) result(FOUND)
-
-    integer, intent(in) :: ne,occ_ne
-    !local variables
-    logical :: FOUND
-    integer :: ne_temp,np
-    character(len=60) :: sub_name
-
-    FOUND = .False.
-    np=elem_nodes(1,ne)
-
-    if (ne == occ_ne) then
-        FOUND = .True.
-    else if (ne == 1) then
-        FOUND = .false.
-    else
-        ne_temp = elems_at_node(np,1)
-        FOUND = is_downstream(ne_temp, occ_ne)
-    end if
-
-    call enter_exit(sub_name,2)
-end function is_downstream
 
 !##############################################################################
 !
