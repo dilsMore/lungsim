@@ -96,6 +96,8 @@ contains
     sum_tidal = 0.0_dp ! initialise the inspired and expired volumes
     sum_expid = 0.0_dp
     last_vol = 0.0_dp
+    unit_field(nu_Pe_max,:) = -1.0e6_dp
+    unit_field(nu_Pe_min,:) = 1.0e6_dp
 
 !!! set default values for the parameters that control the breathing simulation
 !!! these should be controlled by user input (showing hard-coded for now)
@@ -585,6 +587,12 @@ contains
        !estimate an elastic recoil pressure for the unit
        unit_field(nu_pe,nunit) = cc/2.0_dp*(3.0_dp*a+b)*(lambda**2.0_dp &
             -1.0_dp)*exp_term/lambda
+       ! set minimum and maximum Pe values
+       unit_field(nu_Pe_max,nunit) = max(unit_field(nu_Pe_max,nunit), &
+            unit_field(nu_pe,nunit))
+       unit_field(nu_Pe_min,nunit) = min(unit_field(nu_Pe_min,nunit), &
+            unit_field(nu_pe,nunit))
+       
     enddo !nunit
 
     call enter_exit(sub_name,2)

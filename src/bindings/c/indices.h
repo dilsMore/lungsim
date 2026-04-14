@@ -3,6 +3,7 @@
 
 #include "symbol_export.h"
 SHO_PUBLIC void define_problem_type(const char *PROBLEMTYPE);
+SHO_PUBLIC void lymphatic_indices();
 SHO_PUBLIC void ventilation_indices();
 SHO_PUBLIC void perfusion_indices();
 SHO_PUBLIC int get_ne_radius();

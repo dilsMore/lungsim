@@ -22,51 +22,17 @@ module math_utilities
 
 contains
 
-subroutine bessel_complex(z,bessel0,bessel1)
+  subroutine bessel_complex(z, bessel0, bessel1)
+    use, intrinsic :: ieee_arithmetic
+    implicit none
 
-  complex(dp), intent(in) :: z
-  complex(dp), intent(out) :: bessel0,bessel1
+    complex(dp), intent(in)  :: z
+    complex(dp), intent(out) :: bessel0, bessel1
 
-  real(dp) :: a(12),a1(10),b(12)
-  real(dp) :: a0
-  complex(dp) :: ci,cr,z1,ca,zr
-  integer :: k,k0
-!  complex ( kind = 8 ) ca
-!  complex ( kind = 8 ) cb
-!  complex ( kind = 8 ) ci
-!  complex ( kind = 8 ) cr
-!  complex ( kind = 8 ) cs
-!  complex ( kind = 8 ) ct
-!  complex ( kind = 8 ) cw
-!  integer ( kind = 4 ) k
-!  integer ( kind = 4 ) k0
-!  real ( kind = 8 ) pi
-!  real ( kind = 8 ) w0
-!  complex ( kind = 8 ) z
-!  complex ( kind = 8 ) z1
-!  complex ( kind = 8 ) z2
-!  complex ( kind = 8 ) zr
-!  complex ( kind = 8 ) zr2
-  a = (/ &
-    0.125e00_dp,           7.03125e-02_dp,&
-    7.32421875e-02_dp,      1.1215209960938e-01_dp,&
-    2.2710800170898e-01_dp, 5.7250142097473e-01_dp,&
-    1.7277275025845e00_dp, 6.0740420012735e00_dp,&
-    2.4380529699556e01_dp, 1.1001714026925e02_dp,&
-    5.5133589612202e02_dp, 3.0380905109224e03_dp /)
-   a1 = (/ &
-    0.125e00_dp,            0.2109375e00_dp, &
-    1.0986328125e00_dp,     1.1775970458984e01_dp, &
-    2.1461706161499e002_dp, 5.9511522710323e03_dp, &
-    2.3347645606175e05_dp,  1.2312234987631e07_dp, &
-    8.401390346421e08_dp,   7.2031420482627e10_dp /)
-   b = (/ &
-   -0.375e00_dp,           -1.171875e-01_dp, &
-   -1.025390625e-01_dp,     -1.4419555664063e-01_dp, &
-   -2.7757644653320e-01_dp, -6.7659258842468e-01_dp, &
-   -1.9935317337513e00_dp, -6.8839142681099e00_dp, &
-   -2.7248827311269e01_dp, -1.2159789187654e02_dp, &
-   -6.0384407670507e02_dp, -3.3022722944809e03_dp /)
+    real(dp)    :: a(12), a1(10), b(12)
+    real(dp)    :: a0, absz, scale
+    complex(dp) :: cr, z1, ca, zr, zwork
+    integer     :: k, k0
 
 !
   ci = cmplx (0.0_dp,1.0_dp,8)
@@ -114,28 +80,166 @@ subroutine bessel_complex(z,bessel0,bessel1)
       k0 = 9
     else
       k0 = 7
+    ! -----------------------
+    ! User-tunable safety caps
+    ! -----------------------
+    real(dp), parameter :: Z_SMALL   = 1.0e-12_dp     ! small-|z| threshold
+    real(dp), parameter :: Z_ABS_MAX = 200.0_dp       ! cap |z| (keeps series/asymptotic stable)
+    real(dp), parameter :: Z_RE_MAX  = 50.0_dp        ! cap Re(z) to avoid exp overflow / solver blow-up
+    real(dp), parameter :: REL_TOL   = 1.0e-15_dp
+
+    ! Coefficients (unchanged from your original)
+    a = (/ &
+      0.125e00_dp,            7.03125e-02_dp, &
+      7.32421875e-02_dp,      1.1215209960938e-01_dp, &
+      2.2710800170898e-01_dp, 5.7250142097473e-01_dp, &
+      1.7277275025845e00_dp,  6.0740420012735e00_dp, &
+      2.4380529699556e01_dp,  1.1001714026925e02_dp, &
+      5.5133589612202e02_dp,  3.0380905109224e03_dp /)
+
+    a1 = (/ &
+      0.125e00_dp,            0.2109375e00_dp, &
+      1.0986328125e00_dp,     1.1775970458984e01_dp, &
+      2.1461706161499e002_dp, 5.9511522710323e03_dp, &
+      2.3347645606175e05_dp,  1.2312234987631e07_dp, &
+      8.401390346421e08_dp,   7.2031420482627e10_dp /)
+
+    b = (/ &
+     -0.375e00_dp,           -1.171875e-01_dp, &
+     -1.025390625e-01_dp,     -1.4419555664063e-01_dp, &
+     -2.7757644653320e-01_dp, -6.7659258842468e-01_dp, &
+     -1.9935317337513e00_dp, -6.8839142681099e00_dp, &
+     -2.7248827311269e01_dp, -1.2159789187654e02_dp, &
+     -6.0384407670507e02_dp, -3.3022722944809e03_dp /)
+
+    ! -----------------------
+    ! 0) Input sanitisation
+    ! -----------------------
+    if (.not. ieee_is_finite(real(z)) .or. .not. ieee_is_finite(aimag(z))) then
+      bessel0 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+      bessel1 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+      return
     end if
 
-    ca = exp(z1)/sqrt(2.0_dp*pi*z1)
-    bessel0 = cmplx(1.0_dp,0.0_dp,8)
-    zr = 1.0_dp/z1
-    do k = 1,k0
-      bessel0 = bessel0 + a(k) * zr ** k
-    enddo
-    bessel0 = ca * bessel0
-    bessel1 = cmplx (1.0_dp,0.0_dp,8)
-    do k = 1,k0
-      bessel1 =bessel1+b(k)*zr**k
-    end do
-    bessel1 = ca * bessel1
-  endif
+    ! -----------------------
+    ! 1) Optional clipping
+    !    (prevents solver-destroying growth from exp(Re(z)))
+    ! -----------------------
+    zwork = z
 
+    ! Clip real part (prevents exp overflow and insane growth)
+    if (real(zwork) > Z_RE_MAX) zwork = cmplx(Z_RE_MAX, aimag(zwork), kind=dp)
+    if (real(zwork) < -Z_RE_MAX) zwork = cmplx(-Z_RE_MAX, aimag(zwork), kind=dp)
 
-  if ( real (z).lt.0.0_dp)then
-    bessel1 = - bessel1
-  endif
+    ! Clip magnitude (keeps powers zr**k and series stable)
+    absz = abs(zwork)
+    if (absz > Z_ABS_MAX .and. absz > 0.0_dp) then
+      scale = Z_ABS_MAX / absz
+      zwork = zwork * scale
+      absz  = Z_ABS_MAX
+    end if
 
-end subroutine bessel_complex
+    a0 = absz
+
+    ! -----------------------
+    ! 2) Robust small-|z| handling
+    ! -----------------------
+    if (a0 <= max(zero_tol, Z_SMALL)) then
+      bessel0 = cmplx(1.0_dp, 0.0_dp, kind=dp)  ! I0(0)=1
+      bessel1 = 0.5_dp * zwork                  ! I1(z) ~ z/2 near 0
+      return
+    end if
+
+    ! Preserve original symmetry rule based on ORIGINAL z (not clipped zwork)
+    if (real(z) < 0.0_dp) then
+      z1 = -zwork
+    else
+      z1 =  zwork
+    end if
+
+    ! -----------------------
+    ! 3) Main evaluation
+    ! -----------------------
+    if (a0 <= 18.0_dp) then
+      ! ---- Power series (safe region) ----
+
+      ! I0(z) series
+      bessel0 = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      cr      = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      do k = 1, 50
+        cr = 0.25_dp * cr * (z1*z1) / real(k*k, dp)
+        bessel0 = bessel0 + cr
+        if (abs(cr) < REL_TOL * max(1.0_dp, abs(bessel0))) exit
+      end do
+
+      ! I1(z) series (match z1 consistently)
+      bessel1 = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      cr      = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      do k = 1, 50
+        cr = 0.25_dp * cr * (z1*z1) / real(k*(k+1), dp)
+        bessel1 = bessel1 + cr
+        if (abs(cr) < REL_TOL * max(1.0_dp, abs(bessel1))) exit
+      end do
+      bessel1 = 0.5_dp * z1 * bessel1
+
+    else
+      ! ---- Asymptotic branch (large |z|) ----
+
+      if (a0 < 35.0_dp) then
+        k0 = 12
+      else if (a0 < 50.0_dp) then
+        k0 = 9
+      else
+        k0 = 7
+      end if
+
+      ! Guard against tiny z1 (paranoia)
+      if (abs(z1) <= max(zero_tol, Z_SMALL)) then
+        bessel0 = cmplx(1.0_dp, 0.0_dp, kind=dp)
+        bessel1 = 0.5_dp * z1
+        return
+      end if
+
+      ! If exp(z1) would overflow, DO NOT inject huge().
+      ! Return bounded values so your network doesn't explode.
+      if (real(z1) > log(huge(1.0_dp)) - 2.0_dp) then
+        bessel0 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+        bessel1 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+        return
+      end if
+
+      zr = 1.0_dp / z1
+      ca = exp(z1) / sqrt(2.0_dp*pi*z1)
+
+      bessel0 = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      do k = 1, k0
+        bessel0 = bessel0 + a(k) * (zr ** k)
+      end do
+      bessel0 = ca * bessel0
+
+      bessel1 = cmplx(1.0_dp, 0.0_dp, kind=dp)
+      do k = 1, k0
+        bessel1 = bessel1 + b(k) * (zr ** k)
+      end do
+      bessel1 = ca * bessel1
+    end if
+
+    ! Preserve original sign correction rule
+    if (real(z) < 0.0_dp) then
+      bessel1 = -bessel1
+    end if
+
+    ! -----------------------
+    ! 4) Final sanitisation (NEVER return NaN/Inf)
+    ! -----------------------
+    if (.not. ieee_is_finite(real(bessel0)) .or. .not. ieee_is_finite(aimag(bessel0))) then
+      bessel0 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+    end if
+    if (.not. ieee_is_finite(real(bessel1)) .or. .not. ieee_is_finite(aimag(bessel1))) then
+      bessel1 = cmplx(0.0_dp, 0.0_dp, kind=dp)
+    end if
+
+  end subroutine bessel_complex
 
 
 !

@@ -30,6 +30,7 @@ set(INTERFACE_SRCS
   ../interface/indices.i
   ../interface/imports.i
   ../interface/particle_transport.i
+  ../interface/lymphatics.i
   ../interface/pressure_resistance_flow.i
   ../interface/species_transport.i
   ../interface/ventilation.i

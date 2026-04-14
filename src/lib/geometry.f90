@@ -421,6 +421,7 @@ contains
     unit_field=0.0_dp
     units=0
     elem_units_below(1:num_elems) = 0 !initialise the number of terminal units below a branch
+    elem_field(ne_unit,:) = 0.0_dp
     
     nu=0
     do ne=1,num_elems
@@ -428,6 +429,7 @@ contains
           nu=nu+1
           units(nu)=ne     !Set up units array containing terminals
           elem_units_below(ne)=1
+          elem_field(ne_unit,ne) = real(nu)
        endif
     enddo
     
