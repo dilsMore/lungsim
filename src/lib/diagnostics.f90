@@ -43,7 +43,6 @@ contains
 !!!######################################################################
 
   subroutine set_diagnostics_on(state)
-  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_SET_DIAGNOSTICS_ON":: SET_DIAGNOSTICS_ON
 
     logical, intent(in) :: state
 
@@ -52,7 +51,6 @@ contains
   end subroutine set_diagnostics_on
 
   subroutine get_diagnostics_on(state)
-  !DEC$ ATTRIBUTES DLLEXPORT, ALIAS:"SO_GET_DIAGNOSTICS_ON":: GET_DIAGNOSTICS_ON
     implicit none
 
     logical :: state
