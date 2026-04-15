@@ -14,7 +14,7 @@ module arrays
   
   implicit none
 
-  integer :: num_elems,num_elems_2d,num_nodes,num_data,num_nodes_2d,num_units,num_lines_2d,maxgen
+  integer :: num_elems,num_elems_2d,num_nodes,num_data,num_nodes_2d,num_triangles,num_units,num_vertices,num_lines_2d,maxgen
 
   integer,allocatable :: nodes(:) !allocated in define_node_geometry
   integer,allocatable :: nodes_2d(:) !allocated in define_node_geometry_2d
@@ -163,7 +163,7 @@ module arrays
   private
 
   public set_node_field_value, elem_field, num_elems, num_elems_2d, elem_nodes, node_xyz, &
-         nodes,nodes_2d, elems, num_nodes, num_nodes_2d, num_data, data_xyz, data_weight, &
+         nodes,nodes_2d, elems, num_nodes, num_nodes_2d, num_data, num_triangles, num_vertices, data_xyz, data_weight, &
          node_xyz_2d, node_versn_2d, units, num_units, unit_field, node_field, dp, &
          elem_cnct, elem_ordrs, elem_direction, elems_at_node, elem_symmetry, expansile, &
          elem_units_below, maxgen,capillary_bf_parameters, zero_tol,loose_tol,gasex_field, &
