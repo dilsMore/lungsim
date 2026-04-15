@@ -4,6 +4,8 @@
 
 #include <string.h>
 
+void export_cubic_lagrange_2d_c(const char *EXFILE, int *exfile_len,
+				const char *group_name, int *group_name_len);
 void export_1d_elem_field_c(int *ne_field, const char *EXELEMFILE, int *EXELEMFILE_LEN,
                             const char *group_name, int *group_name_len, const char *field_name, int *field_name_len );
 void export_1d_elem_geometry_c(const char *EXELEMFILE, int *EXELEMFILE_LEN, const char *name, int *name_len);
@@ -19,6 +21,18 @@ void export_data_geometry_c(const char *EXDATAFILE, int *EXDATAFILE_LEN, const c
 void export_elem_field_c(const char *EXELEMFIELD, int *EXELEMFIELD_LEN,
                          const char *name, int *name_len, const char *field_name, int *field_name_len);
 void export_terminal_ssgexch_c(const char *EXNODEFILE, int *filename_len, const char *name, int *name_len);
+void export_triangle_elements_c(const char *EXELEMFILE, int *filename_len,
+			       const char *name, int *name_len);
+void export_triangle_nodes_c(const char *EXNODEFILE, int *filename_len,
+			       const char *name, int *name_len);
+
+void export_cubic_lagrange_2d(const char *EXFILE, const char *group_name)
+{
+  int filename_len = strlen(EXFILE);
+  int group_name_len = strlen(group_name);
+
+  export_cubic_lagrange_2d_c(EXFILE, &filename_len, group_name, &group_name_len);
+}
 
 void export_1d_elem_field(int ne_field, const char *EXELEMFILE, const char *group_name, const char *field_name )
 {
@@ -111,3 +125,18 @@ void export_elem_field(const char *EXELEMFIELD, const char *name, const char *fi
   export_elem_field_c(EXELEMFIELD, &filename_len, name, &name_len, field_name, &field_name_len);
 }
 
+void export_triangle_elements(const char *EXELEMFILE, const char *name)
+{
+  int filename_len = strlen(EXELEMFILE);
+  int name_len = strlen(name);
+
+  export_triangle_elements_c(EXELEMFILE, &filename_len, name, &name_len);
+}
+
+void export_triangle_nodes(const char *EXNODEFILE, const char *name)
+{
+  int filename_len = strlen(EXNODEFILE);
+  int name_len = strlen(name);
+
+  export_triangle_nodes_c(EXNODEFILE, &filename_len, name, &name_len);
+}
