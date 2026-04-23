@@ -6,18 +6,20 @@ contains
 
 !!!###################################################################################
 
-  subroutine solve_particles_decoupled_c(initial_concentration,inlet_concentration,particle_size) &
+  subroutine solve_particles_decoupled_c(initial_concentration,inlet_concentration,particle_size,clearance) &
     bind(C, name="solve_particles_decoupled_c")
     use arrays, only: dp
     use particle_transport, only: solve_particles_decoupled
     implicit none
     
     real(dp),intent(in) :: initial_concentration, inlet_concentration, particle_size
+    logical, intent(in) :: clearance
+
 
 #if defined _WIN32 && defined __INTEL_COMPILER
-    call so_solve_particles_decoupled(initial_concentration,inlet_concentration,particle_size)
+    call so_solve_particles_decoupled(initial_concentration,inlet_concentration,particle_size,clearance)
 #else
-    call solve_particles_decoupled(initial_concentration, inlet_concentration,particle_size)
+    call solve_particles_decoupled(initial_concentration, inlet_concentration,particle_size,clearance)
 #endif
 
   end subroutine solve_particles_decoupled_c

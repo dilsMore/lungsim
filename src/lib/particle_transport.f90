@@ -27,7 +27,7 @@ module particle_transport
 
 contains
 
-  subroutine solve_particles_decoupled(initial_concentration, inlet_concentration, particle_size)
+  subroutine solve_particles_decoupled(initial_concentration, inlet_concentration, particle_size, clearance)
 
 !!!##########################################################################
 !!!##########################################################################
@@ -52,6 +52,7 @@ contains
     real(dp), intent(in) :: initial_concentration
     real(dp), intent(in) :: inlet_concentration
     real(dp), intent(in) :: particle_size
+    logical, intent(in) :: clearance
 
     type(particle_parameters) :: part_param
     type(transport_parameters) :: tp
@@ -272,6 +273,12 @@ contains
      node_field(nj_conc1,1) = tp%inlet_concentration(1) ! need to set here
 
      call solve_particles(fileid,time_end,time_start,.true.,last_breath,tp,part_param,write_mass)
+
+     if(clearance)then
+      call perform_clearance()
+      write(*, *) "Clearance performed"     
+     endif
+
      nstep = nbreath
 !
 !!! Breath Hold
@@ -570,6 +577,13 @@ contains
        endif
 
        err = mass_error
+
+
+
+!!! DM - Call particle clearance mechanism, First Principles of Meteorology and Air Pollution, Lizardis 2016, Springer       
+!         if(clearance_on)then
+!            call perform_clearance()
+!         endif
 
 !      if(last_breath.and.coupled)then
        if(last_breath)then
@@ -2449,6 +2463,28 @@ contains
     call enter_exit(sub_name,2)
 
   end subroutine calc_mass_particles
+
+
+  !############################################################################
+
+  subroutine perform_clearance()
+
+   !! Function to implement the compartment clearance model from:
+   !! First Principles of Meteorology and Air Pollution, Springer, Lazaridis 2016, 
+
+   !! Import particle deposition field, calculate transport vector based upon compartment model, and
+   !! store clearance transport vector as a seperate field that is updated at each timestep
+   !! Allows clearance mechanism to operate independently whilst remaining accessible for future applications
+
+   !! Consider that the mass field is already defined
+
+   ! elem_field(ne_mass,ne0) = elem_field(ne_mass,ne0) + dble(elem_symmetry(ne))*elem_field(ne_mass,ne)
+
+   ! Start with a naive half mechanism to prove element field manipulation
+   elem_field(ne_mass, 1:num_elems) = elem_field(ne_mass, 1:num_elems) * 0.5
+
+
+   end subroutine
 
 
 !#########################################################################
