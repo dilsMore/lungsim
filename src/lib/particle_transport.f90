@@ -52,7 +52,7 @@ contains
     real(dp), intent(in) :: initial_concentration
     real(dp), intent(in) :: inlet_concentration
     real(dp), intent(in) :: particle_size
-    real(dp), intent(in) :: clearance
+    logical, intent(in) :: clearance
 
     type(particle_parameters) :: part_param
     type(transport_parameters) :: tp
@@ -274,8 +274,8 @@ contains
 
      call solve_particles(fileid,time_end,time_start,.true.,last_breath,tp,part_param,write_mass)
 
-     if(clearance/=0)then
-      call perform_clearance(clearance)
+     if(clearance)then
+      call perform_clearance()
       write(*, *) "Clearance performed"     
      endif
 
@@ -2467,9 +2467,7 @@ contains
 
   !############################################################################
 
-  subroutine perform_clearance(clearance)
-
-   real(dp) :: clearance
+  subroutine perform_clearance()
 
    !! Function to implement the compartment clearance model from:
    !! First Principles of Meteorology and Air Pollution, Springer, Lazaridis 2016, 
@@ -2483,7 +2481,7 @@ contains
    ! elem_field(ne_mass,ne0) = elem_field(ne_mass,ne0) + dble(elem_symmetry(ne))*elem_field(ne_mass,ne)
 
    ! Start with a naive half mechanism to prove element field manipulation
-   elem_field(ne_mass, 1:num_elems) = elem_field(ne_mass, 1:num_elems) * clearance
+   elem_field(ne_mass, 1:num_elems) = elem_field(ne_mass, 1:num_elems) * 0.5
 
 
    end subroutine
